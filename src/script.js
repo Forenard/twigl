@@ -129,8 +129,103 @@ import 'firebase/analytics';
         SOUND: 'sound',
     };
 
-    // メニューの表示切替
+    /**
+     * parseMidiMessage(event.data) の戻り値を人間が読みやすい文字列に変換
+     * @param {object} parsed - parseMidiMessage でパースしたオブジェクト
+     * @returns {string} - 「NoteOn(ch1) note=xx vel=xx」などの文字列
+     */
+    function midiMessageToString(parsed) {
+        switch (parsed.type) {
+            case 'noteOn':
+                return ` ● [ MIDI ] NoteOn(ch${parsed.channel}) cc=${parsed.cc} val=${parsed.value}`;
+            case 'noteOff':
+                return ` ● [ MIDI ] NoteOff(ch${parsed.channel}) cc=${parsed.cc} val=${parsed.value}`;
+            case 'controlChange':
+                return ` ● [ MIDI ] ControlChange(ch${parsed.channel}) cc=${parsed.cc} val=${parsed.value}`;
+            default:
+                // unknown など他のメッセージ
+                return ` ● [ MIDI ] Unknown(type=${parsed.type}) status=${parsed.statusByte} data1=${parsed.dataByte1} data2=${parsed.dataByte2}`;
+        }
+    }
+
+    /**
+     * MIDI メッセージ (3バイト) をパースして分かりやすい情報にまとめる関数。
+     * @param {Uint8Array} data - 3バイトのMIDIメッセージ (例: [176, 54, 68])
+     * @returns {object} - パース結果 (type, channel, note/controller, value, velocity等)
+     */
+    function parseMidiMessage(data) {
+        const status = data[0];
+        const data1 = data[1];
+        const data2 = data[2];
+
+        // 上位4ビットがコマンド (NoteOn/NoteOff/CCなど), 下位4ビットがチャンネル(0〜15)
+        const command = status >> 4;           // 0x8〜0xE あたり
+        const channel = (status & 0x0f) + 1;   // 通常は1〜16
+
+        switch (command) {
+            case 0x8: // 0x80 : Note Off
+                return {
+                    type: 'noteOff',
+                    channel: channel,
+                    cc: data1,
+                    value: data2,
+                };
+            case 0x9: // 0x90 : Note On
+                return {
+                    type: 'noteOn',
+                    channel: channel,
+                    cc: data1,
+                    value: data2,
+                };
+            case 0xb: // 0xB0 : Control Change
+                return {
+                    type: 'controlChange',
+                    channel: channel,
+                    cc: data1,
+                    value: data2,
+                };
+            // 必要に応じて他コマンド (Pitch Bend等) を追加してもOK
+            default:
+                return {
+                    type: 'unknown',
+                    statusByte: status,
+                    dataByte1: data1,
+                    dataByte2: data2,
+                };
+        }
+    }
+
+    function onMIDIMessage(event) {
+        const data = event.data;
+        const parsed = parseMidiMessage(data);
+        message.textContent = midiMessageToString(parsed);
+        // メッセージの種類によって処理を分岐
+        // parsed.typeがunknown以外であればmidivaluesに保存
+        if (parsed.type === 'unknown')
+            return;
+        if (parsed.cc < 128) {
+            fragmen.midi[parsed.cc] = parsed.value / 127.0;
+            message.textContent += ` midi${fragmen.midi[parsed.cc]}`;
+        }
+    }
+
+    function initMIDI() {
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then((midiAccess) => {
+                const inputs = midiAccess.inputs.values();
+                for (let input of inputs) {
+                    input.onmidimessage = onMIDIMessage;
+                }
+            });
+        } else {
+            console.warn("MIDI not supported in this browser.");
+        }
+    }
+    // メニューの表示切替 & MIDI デバイスの接続
     window.addEventListener('load', () => {
+        // MIDI デバイスの初期化
+        initMIDI();
+
         // #menu を取得
         const menuEl = document.querySelector('#menu');
         if (!menuEl) return;
@@ -1729,7 +1824,6 @@ import 'firebase/analytics';
             exec: function (editor) {
                 update(editor.getValue());
                 counter.textContent = `${editor.getValue().length}`;
-                hideMenu();
             }
         });
 

@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "firebase": "^7.14.2",
+    "pkg": "^5.8.1",
     "whatwg-fetch": "^3.0.0"
   }
 }
