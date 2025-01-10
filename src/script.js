@@ -204,8 +204,9 @@ import 'firebase/analytics';
         if (parsed.type === 'unknown')
             return;
         if (parsed.cc < 128) {
-            fragmen.midi[parsed.cc] = parsed.value / 127.0;
-            message.textContent += ` midi${fragmen.midi[parsed.cc]}`;
+            const value = parsed.value / 127.0;
+            fragmen.midi[parsed.cc] = value;
+            message.textContent += ` -> midi[${parsed.cc}]=${value.toFixed(4)}`;
         }
     }
 
@@ -221,11 +222,8 @@ import 'firebase/analytics';
             console.warn("MIDI not supported in this browser.");
         }
     }
-    // メニューの表示切替 & MIDI デバイスの接続
-    window.addEventListener('load', () => {
-        // MIDI デバイスの初期化
-        initMIDI();
 
+    function initHideIcon() {
         // #menu を取得
         const menuEl = document.querySelector('#menu');
         if (!menuEl) return;
@@ -277,6 +275,60 @@ import 'firebase/analytics';
             // アイコン画像を更新
             iconImg.src = currentIcon;
         });
+    }
+
+    function initFontSizeIcon() {
+        // #menu を取得
+        const menuEl = document.querySelector('#menu');
+        if (!menuEl) return;
+
+        // #noteicon を取得
+        const noteIconEl = document.querySelector('#noteicon');
+        if (!noteIconEl) return;
+
+        // アイコンのURL
+        const iconFontSize = 'https://cdn-icons-png.flaticon.com/512/5083/5083742.png'; // フォントサイズ
+
+        // 既存のクラス(globaliconinner)を流用したdivを作成
+        const fontSizeIcon = document.createElement('div');
+        fontSizeIcon.id = 'fontSizeIcon';
+        fontSizeIcon.className = 'globaliconinner'; // 既存と同じクラスで見た目合わせ
+        fontSizeIcon.title = 'Font Size Up';
+
+        // アイコン用imgを作成
+        const iconImg = document.createElement('img');
+        iconImg.src = iconFontSize;
+        iconImg.style.width = '100%';
+        // フィルターでアイコンを反転(白くする)
+        // brightness() などはお好みで調整
+        iconImg.style.filter = 'invert(100%)';
+
+        // アイコンをdivの子要素として配置
+        fontSizeIcon.appendChild(iconImg);
+
+        // #noteicon の「すぐ後ろ」に追加
+        noteIconEl.insertAdjacentElement('afterend', fontSizeIcon);
+
+        // クリック時の動作
+        const sizes = [17, 27, 37];
+        let sizemode = 0;
+        fontSizeIcon.addEventListener('click', () => {
+            // フォントサイズを変更
+            sizemode = (sizemode + 1) % sizes.length;
+            editorFontSize = sizes[sizemode];
+            document.querySelector('#editor').style.fontSize = `${editorFontSize}px`;
+            document.querySelector('#editoraudio').style.fontSize = `${editorFontSize}px`;
+        });
+    }
+
+    // ワイのカスタムコード
+    window.addEventListener('load', () => {
+        // MIDI デバイスの初期化
+        initMIDI();
+        // メニューの非表示アイコンの初期化
+        initHideIcon();
+        // フォントサイズ変更アイコンの初期化
+        initFontSizeIcon();
     });
 
     window.addEventListener('DOMContentLoaded', () => {
